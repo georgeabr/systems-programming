@@ -1,8 +1,9 @@
-# systems-programming
-Systems programming - software for Windows NT 3.51 in C++
+# Systems programming
+Systems programming - software for Windows NT 3.51 in C++.  
+You need Visual C++ 4.2 to compile these programs.
 
 ### w32time
-It gets time from an NTP server and optionally syncs it
+It gets time from an NTP server and optionally syncs it.
 ```
 $ w32time.exe pool.ntp.org -set
 Server pool.ntp.org UTC time: 2025-11-08 12:26:37
