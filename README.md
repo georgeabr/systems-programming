@@ -1,5 +1,5 @@
 # systems-programming
-Systems programming
+Systems programming - software for Windows NT 3.51 in C++
 
 ### w32time
 It gets time from an NTP server and optionally syncs it
