@@ -18,3 +18,8 @@ Server pool.ntp.org UTC time: 2025-11-08 12:26:37
 A task manager that shows open applications to which you can switch and end.  
 You can also run new applications.  
 ![Task Manager screenshot](taskman-screenshot1.png?raw=true "Optional Title")
+
+### [task-inter](/task-inter/task-inter.cpp)
+A global hotkey interceptor for NT. Replace the `WinExec` program path with your own.  
+Default key is `Shift+Esc` to activate and run your program.  
+Useful if we want to hook our own task manager for NT.  
