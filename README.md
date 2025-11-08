@@ -23,3 +23,9 @@ You can also run new applications.
 A global hotkey interceptor for NT. Replace the `WinExec` program path with your own.  
 Default key is `Shift+Esc` to activate and run your program.  
 Useful if we want to hook our own task manager for NT.  
+
+### [taskbar](/taskbar/taskbar.cpp)
+A task bar at the bottom of the screen that shows open applications to which you can switch.  
+It has icons for visual guidance.  
+You can double click at the end of the taskbar to exit it.  
+![Task bar screenshot](taskbar-screenshot1.png?raw=true "Optional Title")
