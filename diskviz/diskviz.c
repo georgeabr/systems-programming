@@ -1,6 +1,17 @@
 /*
  * diskviz.c — minimal libfdisk-based partition table visualiser + creator
- * Version 33
+ * Version 34
+ *
+ * SIGINT/SIGHUP/SIGTERM now run the same device-deassign cleanup every
+ * other quit path already goes through — previously Ctrl-C (or a closed
+ * terminal, or `kill`) at any prompt killed the process immediately and
+ * skipped it. draw_bar() now guards against last_lba < first_lba on an
+ * empty/degenerate table instead of wrapping into a huge uint64_t.
+ * parse_sectors() parses against a fixed "C" locale rather than
+ * whatever LC_NUMERIC happens to be active, so "1.5G" can't silently
+ * become "1" under a comma-decimal locale. The two generic
+ * "Failed to add partition"/"Write failed" messages now include
+ * libfdisk's own error code via strerror().
  *
  * Every "q" quit path — main menu, every sub-prompt, every y/N warning
  * — now prints the same message and does the same cleanup, rather than
@@ -140,7 +151,12 @@
  *   sudo ./diskviz /dev/nvme0n1
  */
 
-#define DISKVIZ_VERSION "33"
+#define DISKVIZ_VERSION "34"
+
+/* Needed for strtod_l()/newlocale() in parse_sectors() — glibc only
+ * exposes these under _GNU_SOURCE (or a sufficiently new POSIX feature
+ * test macro), and -std=gnu11 alone doesn't define it for us here. */
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -151,6 +167,8 @@
 #include <fcntl.h>
 #include <time.h>
 #include <errno.h>
+#include <signal.h>
+#include <locale.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <libfdisk/libfdisk.h>
@@ -207,6 +225,12 @@ static unit_t display_unit = UNIT_SECTORS;
 static uint64_t alignment_sectors = 2048; /* advisory alignment target in sectors, recomputed once real sector_size is known — see get_alignment_sectors() */
 static int use_color = 0; /* set once at startup: real terminal on stdout, and NO_COLOR not set — see main() */
 
+/* Set once fdisk_assign_device() succeeds and cleared again at every
+ * point the device is deassigned, purely so handle_termination_signal()
+ * below always knows whether there's a live device to release — see
+ * that function for why it needs this at all. */
+static struct fdisk_context *g_cxt = NULL;
+
 /* ---- minimal ANSI colour support. ----
  * Used to make the table self-explanatory without cross-referencing the
  * staged-operations list below it: a partition that only exists because
@@ -248,10 +272,24 @@ static void format_size(uint64_t sectors, char *buf, size_t buflen) {
 }
 
 /* Parse user input that may be a raw sector count ("204800") or a size with
- * a unit suffix ("500M", "20G", "1.5G", case-insensitive). Returns sectors. */
+ * a unit suffix ("500M", "20G", "1.5G", case-insensitive). Returns sectors.
+ *
+ * Uses strtod_l() against a fixed "C" locale rather than plain strtod(),
+ * which follows whatever LC_NUMERIC happens to be active. Under a locale
+ * that uses a comma as the decimal separator, plain strtod("1.5G") stops
+ * at the '.' and silently returns 1 instead of 1.5 — a fixed locale here
+ * means "1.5G" parses the same regardless of the environment it's run
+ * in. Built once and reused rather than per-call. */
 static uint64_t parse_sectors(const char *str) {
+	static locale_t c_locale = (locale_t)0;
+	if (!c_locale) {
+		c_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
+		/* If allocation somehow fails, fall back to the global locale
+		 * below rather than crashing on a NULL locale_t. */
+	}
+
 	char *end = NULL;
-	double val = strtod(str, &end);
+	double val = c_locale ? strtod_l(str, &end, c_locale) : strtod(str, &end);
 
 	if (end == str) return 0; /* nothing numeric found */
 
@@ -581,6 +619,18 @@ static void build_segments(struct fdisk_context *cxt, const char *disk_path) {
 static void draw_bar(struct fdisk_context *cxt) {
 	uint64_t first_lba = fdisk_get_first_lba(cxt);
 	uint64_t last_lba  = fdisk_get_last_lba(cxt);
+
+	/* On an empty/degenerate table (no label yet, or one libfdisk reports
+	 * zero-sized usable space for) last_lba can come back equal to or
+	 * below first_lba. The subtraction below would then wrap around to
+	 * a huge uint64_t rather than going negative, silently corrupting
+	 * every width calculation in the loop below — so bail with an empty
+	 * bar instead of drawing garbage. */
+	if (last_lba < first_lba) {
+		printf("[]\n");
+		printf("  (no usable space to show yet)\n\n");
+		return;
+	}
 	uint64_t total = last_lba - first_lba + 1;
 
 	printf("[");
@@ -797,6 +847,7 @@ static void quit_if_requested(const char *s, struct fdisk_context *cxt, struct f
 		clear_staged_queue();
 		if (original_tb) fdisk_unref_table(original_tb);
 		fdisk_deassign_device(cxt, 1);
+		g_cxt = NULL;
 		fdisk_unref_context(cxt);
 		exit(0);
 	}
@@ -1022,8 +1073,16 @@ static void create_partition_once(struct fdisk_context *cxt, const char *disk_pa
 			}
 		}
 
-		if (fdisk_add_partition(cxt, pa, &new_partno) != 0) {
-			fprintf(stderr, "Failed to add partition.\n");
+		int add_rc = fdisk_add_partition(cxt, pa, &new_partno);
+		if (add_rc != 0) {
+			/* libfdisk functions return a negative errno-style code on
+			 * failure (e.g. -EINVAL for a bad start/size), so this is
+			 * the same information strerror(errno) would give elsewhere
+			 * in this program — just sourced from the return value
+			 * instead of errno, since libfdisk doesn't set errno itself. */
+			fprintf(stderr, "Failed to add partition (start=%llu size=%llu): %s\n",
+			        (unsigned long long)start, (unsigned long long)size,
+			        strerror(add_rc < 0 ? -add_rc : add_rc));
 			fdisk_unref_partition(pa);
 			return;
 		}
@@ -1669,6 +1728,69 @@ static void print_help(const char *progname) {
 		DISKVIZ_VERSION, progname, progname, progname);
 }
 
+/* ---- SIGINT/SIGHUP/SIGTERM handling ----
+ * Every other quit path in this program — [q], EOF, the blank-disk
+ * "no" answers — runs fdisk_deassign_device() before exiting. Without
+ * this, Ctrl-C (or a closed terminal, or a plain `kill`) at any prompt
+ * killed the process immediately and skipped that step entirely, which
+ * can leave the device's exclusive open/lock held until something else
+ * comes along and releases it.
+ *
+ * This is safe to do abruptly: fdisk_write_disklabel() is the only call
+ * that ever commits anything, so every staged-but-unwritten change here
+ * only ever existed in memory — an interrupted session is exactly as
+ * safe as a deliberate [q]uit, nothing on the real disk changes either
+ * way.
+ *
+ * rl_catch_signals is turned off in main() so readline doesn't install
+ * its own handlers first and race with these. rl_free_line_state() and
+ * rl_cleanup_after_signal() are the readline-provided calls for undoing
+ * readline's terminal state (echo, line discipline, partial input) from
+ * inside a handler like this one — normally readline's own signal
+ * handling would do this, so we do it ourselves instead.
+ *
+ * fdisk_deassign_device() itself isn't documented as async-signal-safe,
+ * but it's a small, bounded close()+ioctl() and this is the same
+ * pattern common CLI tools use for exactly this situation. Exiting via
+ * _exit() rather than exit() avoids running atexit handlers or flushing
+ * stdio from inside a signal handler. The re-entry guard just covers a
+ * second signal arriving while this one is still unwinding. */
+static volatile sig_atomic_t g_terminating = 0;
+
+static void handle_termination_signal(int signum) {
+	if (g_terminating) return;
+	g_terminating = 1;
+
+	rl_free_line_state();
+	rl_cleanup_after_signal();
+
+	if (g_cxt) {
+		fdisk_deassign_device(g_cxt, 1);
+		g_cxt = NULL;
+	}
+
+	static const char msg[] =
+		"\nInterrupted — device released, staged changes were never written.\n";
+	ssize_t ignored = write(STDOUT_FILENO, msg, sizeof(msg) - 1);
+	(void)ignored;
+
+	_exit(128 + signum);
+}
+
+/* Installs handle_termination_signal() for SIGINT, SIGHUP and SIGTERM.
+ * Called once at the top of main(), before readline ever runs. */
+static void install_termination_handlers(void) {
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = handle_termination_signal;
+	sigfillset(&sa.sa_mask); /* don't let another of these three interrupt the handler itself */
+	sa.sa_flags = 0;
+
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGHUP, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
+}
+
 int main(int argc, char **argv) {
 	struct fdisk_context *cxt;
 
@@ -1679,8 +1801,11 @@ int main(int argc, char **argv) {
 
 	use_color = isatty(STDOUT_FILENO) && !getenv("NO_COLOR");
 
+	install_termination_handlers();
+
 	rl_attempted_completion_function = diskviz_attempted_completion;
 	rl_completion_append_character = '\0'; /* don't add a trailing space after completing a number */
+	rl_catch_signals = 0; /* we install our own SIGINT/SIGHUP/SIGTERM handlers above instead */
 
 	printf("diskviz version %s\n\n", DISKVIZ_VERSION);
 
@@ -1700,6 +1825,7 @@ int main(int argc, char **argv) {
 		fdisk_unref_context(cxt);
 		return 1;
 	}
+	g_cxt = cxt; /* device is now live — see handle_termination_signal() */
 
 	sector_size = fdisk_get_sector_size(cxt); /* actual logical sector size, not assumed 512 */
 	alignment_sectors = get_alignment_sectors(argv[1]); /* advisory SSD/RAID-friendly alignment target */
@@ -1720,6 +1846,7 @@ int main(int argc, char **argv) {
 		if (!read_line("Create a new GPT partition table? Type gpt to confirm (anything else to exit): ",
 		               line, sizeof(line))) {
 			fdisk_deassign_device(cxt, 1);
+			g_cxt = NULL;
 			fdisk_unref_context(cxt);
 			return 0;
 		}
@@ -1727,12 +1854,14 @@ int main(int argc, char **argv) {
 		if (strcmp(line, "gpt") != 0) {
 			printf("Not creating a partition table — exiting.\n");
 			fdisk_deassign_device(cxt, 1);
+			g_cxt = NULL;
 			fdisk_unref_context(cxt);
 			return 0;
 		}
 		if (fdisk_create_disklabel(cxt, "gpt") != 0) {
 			fprintf(stderr, "Failed to create a GPT label.\n");
 			fdisk_deassign_device(cxt, 1);
+			g_cxt = NULL;
 			fdisk_unref_context(cxt);
 			return 1;
 		}
@@ -1789,7 +1918,8 @@ int main(int argc, char **argv) {
 			if (!read_line("Write all changes to disk now? Type YES to confirm: ",
 			               confirm, sizeof(confirm))) break;
 			if (strcmp(confirm, "YES") == 0) {
-				if (fdisk_write_disklabel(cxt) == 0) {
+				int write_rc = fdisk_write_disklabel(cxt);
+				if (write_rc == 0) {
 					printf("Partition table written.\n");
 					format_staged_filesystems(cxt, argv[1], original_tb);
 
@@ -1808,7 +1938,11 @@ int main(int argc, char **argv) {
 					if (fdisk_get_partitions(cxt, &original_tb) != 0)
 						original_tb = NULL;
 				} else {
-					fprintf(stderr, "Write failed.\n");
+					/* Same reasoning as the "Failed to add partition"
+					 * message above: libfdisk returns a negative
+					 * errno-style code rather than setting errno. */
+					fprintf(stderr, "Write failed: %s\n",
+					        strerror(write_rc < 0 ? -write_rc : write_rc));
 				}
 			} else {
 				printf("Not written.\n");
@@ -1821,6 +1955,7 @@ int main(int argc, char **argv) {
 			clear_staged_queue();
 			if (original_tb) fdisk_unref_table(original_tb);
 			fdisk_deassign_device(cxt, 1);
+			g_cxt = NULL;
 			fdisk_unref_context(cxt);
 			return 0;
 		default:
@@ -1831,6 +1966,7 @@ int main(int argc, char **argv) {
 	clear_staged_queue();
 	if (original_tb) fdisk_unref_table(original_tb);
 	fdisk_deassign_device(cxt, 1 /* no_write_on_deassign: leave as-is, we already wrote explicitly */);
+	g_cxt = NULL;
 	fdisk_unref_context(cxt);
 	return 0;
 }
