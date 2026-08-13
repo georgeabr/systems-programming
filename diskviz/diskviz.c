@@ -1,6 +1,11 @@
 /*
  * diskviz.c — minimal libfdisk-based partition table visualiser + creator
- * Version 34
+ * Version 35
+ *
+ * parse_sectors()'s locale fix reworked to be portable: was using
+ * newlocale()/strtod_l() (glibc-only, needed _GNU_SOURCE), now saves
+ * and restores LC_NUMERIC around a plain strtod() call instead — works
+ * on musl and other libcs too, and there's no locale_t left to leak.
  *
  * SIGINT/SIGHUP/SIGTERM now run the same device-deassign cleanup every
  * other quit path already goes through — previously Ctrl-C (or a closed
@@ -151,12 +156,7 @@
  *   sudo ./diskviz /dev/nvme0n1
  */
 
-#define DISKVIZ_VERSION "34"
-
-/* Needed for strtod_l()/newlocale() in parse_sectors() — glibc only
- * exposes these under _GNU_SOURCE (or a sufficiently new POSIX feature
- * test macro), and -std=gnu11 alone doesn't define it for us here. */
-#define _GNU_SOURCE
+#define DISKVIZ_VERSION "35"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -274,22 +274,27 @@ static void format_size(uint64_t sectors, char *buf, size_t buflen) {
 /* Parse user input that may be a raw sector count ("204800") or a size with
  * a unit suffix ("500M", "20G", "1.5G", case-insensitive). Returns sectors.
  *
- * Uses strtod_l() against a fixed "C" locale rather than plain strtod(),
- * which follows whatever LC_NUMERIC happens to be active. Under a locale
- * that uses a comma as the decimal separator, plain strtod("1.5G") stops
- * at the '.' and silently returns 1 instead of 1.5 — a fixed locale here
+ * Temporarily forces LC_NUMERIC to "C" around the strtod() call rather
+ * than using whatever locale is active. Under a locale that uses a
+ * comma as the decimal separator, plain strtod("1.5G") stops at the
+ * '.' and silently returns 1 instead of 1.5 — pinning the locale here
  * means "1.5G" parses the same regardless of the environment it's run
- * in. Built once and reused rather than per-call. */
+ * in. setlocale()/strtod() (rather than the GNU-only strtod_l()) keeps
+ * this portable to non-glibc libcs too; safe here since diskviz is
+ * single-threaded, so there's no concurrent caller to race with the
+ * global locale change. */
 static uint64_t parse_sectors(const char *str) {
-	static locale_t c_locale = (locale_t)0;
-	if (!c_locale) {
-		c_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
-		/* If allocation somehow fails, fall back to the global locale
-		 * below rather than crashing on a NULL locale_t. */
-	}
+	char *saved_locale = setlocale(LC_NUMERIC, NULL);
+	char saved_locale_buf[64];
+	if (saved_locale) snprintf(saved_locale_buf, sizeof(saved_locale_buf), "%s", saved_locale);
+	else saved_locale_buf[0] = '\0';
+
+	setlocale(LC_NUMERIC, "C");
 
 	char *end = NULL;
-	double val = c_locale ? strtod_l(str, &end, c_locale) : strtod(str, &end);
+	double val = strtod(str, &end);
+
+	if (saved_locale_buf[0]) setlocale(LC_NUMERIC, saved_locale_buf);
 
 	if (end == str) return 0; /* nothing numeric found */
 
