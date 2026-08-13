@@ -2,6 +2,11 @@
 
 Minimal libfdisk-based partition table visualiser and creator.
 
+## Compilation
+```bash
+gcc -O2 -Wall $(pkg-config --cflags --libs fdisk blkid) -lreadline -o diskviz diskviz.c
+```
+
 ## Usage
 
 ```text
