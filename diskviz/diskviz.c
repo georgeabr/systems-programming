@@ -1,6 +1,30 @@
 /*
+ * SPDX-License-Identifier: NC-SA-BIN-CL-1.2
+ *
+ * Copyright (c) George Abraham, https://github.com/georgeabr/
+ *
+ * Licensed under the Non-Commercial Source-Available Licence with
+ * Commercial Licensing (NC-SA-BIN-CL), version 1.2. Non-commercial use,
+ * study, modification and distribution are permitted; any commercial
+ * use requires a separate licence from the copyright holder. See the
+ * licence in the parent GitHub repo for full terms. For commercial
+ * licensing, contact via GitHub Issues or support@georgetech.co.uk.
+ */
+
+/*
  * diskviz.c — minimal libfdisk-based partition table visualiser + creator
- * Version 36
+ * Version 39
+ *
+ * Licence notice email corrected: support@georgetech.co.uk, not
+ * george@georgetech.co.uk.
+ *
+ * Licence notice wording: "see LICENSE" -> "see licence in the parent
+ * GitHub repo" (this .c file may travel standalone, so pointing at a
+ * repo rather than an assumed local LICENSE file is clearer).
+ *
+ * Added the SPDX/copyright/licence header (NC-SA-BIN-CL v1.2, matching
+ * the licence used elsewhere in georgeabr's repos) and the matching
+ * notice at the end of --help output.
  *
  * A blank length at the new-partition prompt now means "fill to the end
  * of this segment", matching how a blank start already means "start of
@@ -163,7 +187,7 @@
  *   sudo ./diskviz /dev/nvme0n1
  */
 
-#define DISKVIZ_VERSION "36"
+#define DISKVIZ_VERSION "39"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1741,7 +1765,11 @@ static void print_help(const char *progname) {
 "plain \"NO_COLOR=1 sudo ...\" before diskviz ever sees it:\n"
 "  sudo env NO_COLOR=1 %s /dev/DEVICE\n\n"
 "At most prompts, press Tab to autocomplete a suggested value, or type\n"
-"q to back out without changing anything.\n",
+"q to back out without changing anything.\n\n"
+"Copyright (c) George Abraham, https://github.com/georgeabr/\n"
+"Licensed under the Non-Commercial Source-Available Licence with\n"
+"Commercial Licensing (NC-SA-BIN-CL) v1.2 — see licence in the parent\n"
+"GitHub repo, or contact support@georgetech.co.uk for commercial licensing.\n",
 		DISKVIZ_VERSION, progname, progname, progname);
 }
 
