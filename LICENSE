@@ -1,47 +1,40 @@
-# Non‑Commercial Source‑Available Licence with Commercial Licensing (NC‑SA‑BIN‑CL) — Version 1.2
+Non‑Commercial Source‑Available Licence with Commercial Licensing (NC‑SA‑BIN‑CL) — Version 1.2
 
-**SPDX-License-Identifier: NC-SA-BIN-CL-1.2**
+SPDX-License-Identifier: NC-SA-BIN-CL-1.2
 
-**Copyright (c) George Abraham**
+Copyright (c) George Abraham
 
-Permission is granted, free of charge, to any person obtaining a copy of this Software and associated documentation files (“the Software”), to use, view, study, modify, and distribute the Software **for strictly non‑commercial purposes**, subject to the following conditions:
+Permission is granted, free of charge, to any person obtaining a copy of this Software and associated documentation files (“the Software”), to use, view, study, modify, and distribute the Software for strictly non‑commercial purposes, subject to the following conditions:
 
-## 1. Non‑Commercial Use Only
-The Software, including any modified versions, derivative works, binaries, or portions thereof, **may not be used for any commercial purpose**, whether direct or indirect.  
-“Commercial purpose” includes, without limitation:  
-a) use in, as, or with any product or service offered for sale;  
-b) use in any revenue‑generating activity;  
-c) use within any business, corporation, or organization for internal operations, tooling, automation, or infrastructure;  
+1. Non‑Commercial Use Only
+The Software, including any modified versions, derivative works, binaries, or portions thereof, may not be used for any commercial purpose, whether direct or indirect.
+“Commercial purpose” includes, without limitation:
+a) use in, as, or with any product or service offered for sale;
+b) use in any revenue‑generating activity;
+c) use within any business, corporation, or organization for internal operations, tooling, automation, or infrastructure;
 d) use in paid consulting, contracting, or employment.
-
-## 2. Non‑Commercial Distribution Allowed
-You may distribute:  
-a) unmodified source code;  
-b) modified source code;  
-c) compiled binaries;  
-d) derivative works;  
-**provided that all such distribution is strictly non‑commercial** and includes this licence in full.
-
-## 3. Commercial Licensing
-Any commercial use of the Software, including internal business use, external distribution, SaaS deployment, or incorporation into a commercial product or service, **requires a separate commercial licence** obtained from the copyright holder.  
+2. Non‑Commercial Distribution Allowed
+You may distribute:
+a) unmodified source code;
+b) modified source code;
+c) compiled binaries;
+d) derivative works;
+provided that all such distribution is strictly non‑commercial and includes this licence in full.
+3. Commercial Licensing
+Any commercial use of the Software, including internal business use, external distribution, SaaS deployment, or incorporation into a commercial product or service, requires a separate commercial licence obtained from the copyright holder.
 No commercial rights are granted under this licence.
-
-## 4. Patent Grant (Non‑Commercial)
-Subject to the terms of this licence, the copyright holder grants you a **non‑exclusive, worldwide, royalty‑free patent licence** to use the Software for non‑commercial purposes.
-
-## 5. Patent Retaliation
+4. Patent Grant (Non‑Commercial)
+Subject to the terms of this licence, the copyright holder grants you a non‑exclusive, worldwide, royalty‑free patent licence to use the Software for non‑commercial purposes.
+5. Patent Retaliation
 If you initiate patent litigation alleging that the Software infringes a patent, your rights under this licence automatically terminate.
-
-## 6. Anti‑AI‑Training Clause
-You may not use the Software, or any portion thereof, for:  
-a) training, fine‑tuning, or evaluating machine‑learning models;  
-b) generating datasets for machine‑learning or AI systems;  
-c) embedding, vectorising, or feature‑extracting the Software for automated analysis;  
-d) automated scraping or ingestion by AI systems.  
+6. Anti‑AI‑Training Clause
+You may not use the Software, or any portion thereof, for:
+a) training, fine‑tuning, or evaluating machine‑learning models;
+b) generating datasets for machine‑learning or AI systems;
+c) embedding, vectorising, or feature‑extracting the Software for automated analysis;
+d) automated scraping or ingestion by AI systems.
 Private, manual study by humans is permitted.
-
-## 7. No Circumvention
+7. No Circumvention
 You may not remove, alter, or circumvent any licence terms, notices, or restrictions contained in the Software.
-
-## 8. Warranty Disclaimer
+8. Warranty Disclaimer
 THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
