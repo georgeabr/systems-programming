@@ -1,6 +1,13 @@
 /*
  * diskviz.c — minimal libfdisk-based partition table visualiser + creator
- * Version 35
+ * Version 36
+ *
+ * A blank length at the new-partition prompt now means "fill to the end
+ * of this segment", matching how a blank start already means "start of
+ * the segment" — previously it was parsed as 0 and rejected as "doesn't
+ * fit". format_size()'s MiB/GiB output now says "MiB"/"GiB" rather than
+ * a bare "M"/"G", matching the column headers and the labels
+ * format_bytes_short() already uses elsewhere.
  *
  * parse_sectors()'s locale fix reworked to be portable: was using
  * newlocale()/strtod_l() (glibc-only, needed _GNU_SOURCE), now saves
@@ -156,7 +163,7 @@
  *   sudo ./diskviz /dev/nvme0n1
  */
 
-#define DISKVIZ_VERSION "35"
+#define DISKVIZ_VERSION "36"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -259,10 +266,10 @@ static void format_size(uint64_t sectors, char *buf, size_t buflen) {
 	double bytes = (double)sectors * (double)sector_size;
 	switch (display_unit) {
 	case UNIT_MIB:
-		snprintf(buf, buflen, "%.2fM", bytes / (1024.0 * 1024.0));
+		snprintf(buf, buflen, "%.2f MiB", bytes / (1024.0 * 1024.0));
 		break;
 	case UNIT_GIB:
-		snprintf(buf, buflen, "%.2fG", bytes / (1024.0 * 1024.0 * 1024.0));
+		snprintf(buf, buflen, "%.2f GiB", bytes / (1024.0 * 1024.0 * 1024.0));
 		break;
 	case UNIT_SECTORS:
 	default:
@@ -1002,12 +1009,17 @@ static void create_partition_once(struct fdisk_context *cxt, const char *disk_pa
 
 		snprintf(promptbuf, sizeof(promptbuf),
 			"Length of new partition — sectors, or e.g. 500M/20G\n"
-			"  (Tab = %s max, NOT an absolute end, q to quit)\n> ",
+			"  (blank = fill to end, Tab = %s max, NOT an absolute end, q to quit)\n> ",
 			maxval);
 		if (!read_line(promptbuf, line, sizeof(line))) return;
 	}
 	quit_if_requested(line, cxt, original_tb);
-	size = parse_sectors(line);
+
+	/* Blank means "use everything left in this segment", matching how
+	 * a blank start already means "start of the segment" above — rather
+	 * than parse_sectors("") returning 0 and that 0 then being rejected
+	 * as "doesn't fit". */
+	size = (line[0] == '\0') ? (segments[idx].end - start + 1) : parse_sectors(line);
 
 	if (size == 0 || size > segments[idx].end - start + 1) {
 		fprintf(stderr, "That length doesn't fit in the remaining space from this start.\n");
